@@ -120,9 +120,13 @@ module LockJar
         end
         
         lock_data['scopes'] = {} 
-          
-        lock_jar_file.notations.each do |scope, notations|
-          
+
+        all_dependencies = []
+        all_notations = []
+        lock_jar_file.notations.keys.sort.each do |scope|
+
+          notations = lock_jar_file.notations[scope]
+
           if needs_force_encoding
             notations.map! { |notation| notation.force_encoding("UTF-8") }
           end
@@ -131,9 +135,13 @@ module LockJar
           notations.each do |notation|
             dependencies << {notation => scope}
           end
+
+          # use cumulative deps to resolve current scope to avoid conflicts
+          all_dependencies += dependencies
           
           if dependencies.size > 0
-            resolved_notations = resolver(opts).resolve( dependencies, opts[:download] == true )
+            resolved_notations = resolver(opts).resolve( all_dependencies, opts[:download] == true )
+            resolved_notations -= all_notations # remove previously resolved notations
             
             lock_data['repositories'] = resolver(opts).remote_repositories.uniq
             if needs_force_encoding
@@ -149,6 +157,8 @@ module LockJar
             lock_data['scopes'][scope] = { 
               'dependencies' => notations,
               'resolved_dependencies' => resolved_notations } 
+
+            all_notations += resolved_notations
           end
         end
     
